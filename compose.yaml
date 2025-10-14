@@ -1,0 +1,82 @@
+services:
+
+#Cliente MCP
+  client-mcp:
+    image: yefff/image-client-laravel:1.0.0
+    container_name: client-mcp
+    env_file:
+      - .env.docker
+    ports:
+      - "8000:8000"
+    depends_on:
+      medicoia-llm:
+        condition: service_healthy
+      medicoia-model-setup:
+        condition: service_completed_successfully
+    networks:
+      - laravel-network
+    restart: unless-stopped
+
+#Servidor MCP
+  server-mcp:
+    image: yefff/image-server-laravel:1.0.0
+    container_name: server-mcp
+    env_file:
+      - .env.docker
+    depends_on:
+      medicoia-llm:
+        condition: service_healthy
+      medicoia-model-setup:
+        condition: service_completed_successfully
+    networks:
+      - laravel-network
+    restart: unless-stopped
+
+#LLM  de Mistral
+  mistral-llm:
+    image: ollama/ollama
+    container_name: mistral-llm
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - laravel-network
+    restart: unless-stopped
+
+  # Servicio para descargar el modelo automáticamente
+  mistral-model-setup:
+    image: curlimages/curl:latest
+    container_name: mistral-model-setup
+    depends_on:
+      mistral-llm:
+        condition: service_healthy
+    command: |
+      sh -c "
+        echo 'Verificando si el modelo mistral existe...'
+        if ! curl -s http://mistral-llm:11434/api/tags | grep -q 'mistral'; then
+          echo 'Descargando modelo mistral...'
+          curl -X POST http://mistral-llm:11434/api/pull -d '{\"name\":\"mistral\"}'
+          echo 'Modelo descargado correctamente'
+        else
+          echo 'Modelo ya existe, continuando...'
+        fi
+      "
+    networks:
+      - laravel-network
+    restart: "no"
+
+volumes:
+  ollama_data:
+
+networks:
+  laravel-network:
+    driver: bridge
