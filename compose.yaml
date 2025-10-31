@@ -9,9 +9,9 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      medicoia-llm:
+      mistral-llm:
         condition: service_healthy
-      medicoia-model-setup:
+      mistral-model-setup:
         condition: service_completed_successfully
     networks:
       - laravel-network
@@ -24,9 +24,9 @@ services:
     env_file:
       - .env.docker
     depends_on:
-      medicoia-llm:
+      mistral-llm:
         condition: service_healthy
-      medicoia-model-setup:
+      mistral-model-setup:
         condition: service_completed_successfully
     networks:
       - laravel-network
