@@ -1,9 +1,9 @@
 services:
 
 #Cliente MCP
-  client-mcp:
-    image: yefff/image-client-laravel:1.0.0
-    container_name: client-mcp
+  mcp-client:
+    image: yefff/image-mcp-client:1.0.0
+    container_name: mcp-client
     env_file:
       - .env.docker
     ports:
@@ -17,17 +17,55 @@ services:
       - laravel-network
     restart: unless-stopped
 
-#Servidor MCP
-  server-mcp:
-    image: yefff/image-server-laravel:1.0.0
-    container_name: server-mcp
+#Servidores MCP
+  mcp-processes:
+    image: yefff/image-mcp-server-processes:1.0.0
+    container_name: mcp-processes
     env_file:
-      - .env.docker
+      - .env.docker.mcp-processes
     depends_on:
       mistral-llm:
         condition: service_healthy
       mistral-model-setup:
         condition: service_completed_successfully
+    networks:
+      - laravel-network
+    restart: unless-stopped
+  mcp-rag:
+    image: yefff/image-mcp-server-rag:1.0.0
+    container_name: mcp-rag
+    env_file:
+      - .env.docker.mcp-rag
+    depends_on:
+      mistral-llm:
+        condition: service_healthy
+      mistral-model-setup:
+        condition: service_completed_successfully
+      database-rag:
+        condition: service_healthy
+    networks:
+      - laravel-network
+    restart: unless-stopped
+
+#Base de datos
+  database-rag:
+    image: yefff/image-database-postgresql-custom:1.0.0
+    container_name: database-rag
+    env_file:
+      - .env.docker.database-rag
+    ports:
+      - "5433:5432"
+    networks:
+      - laravel-network
+    restart: unless-stopped
+
+  database-cache:
+    image: redis:7.0-alpine
+    container_name: database-cache
+    env_file:
+      - .env.docker.database-cache
+    ports:
+      - "6380:6379"
     networks:
       - laravel-network
     restart: unless-stopped
@@ -52,7 +90,7 @@ services:
       - laravel-network
     restart: unless-stopped
 
-  # Servicio para descargar el modelo automáticamente
+# Servicio para descargar el modelo automáticamente
   mistral-model-setup:
     image: curlimages/curl:latest
     container_name: mistral-model-setup
